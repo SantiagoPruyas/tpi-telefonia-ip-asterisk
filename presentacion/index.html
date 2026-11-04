@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telefonía IP con Asterisk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f6f4ee;
+  --paper-2:#ebe8df;
+  --card:#fffefb;
+  --ink:#0d3b45;
+  --ink-2:#4b6267;
+  --ink-3:#7d8e91;
+  --line:rgba(13,59,69,.14);
+  --accent:#148a7c;
+  --accent-soft:#dcefeb;
+  --sun:#e9a714;
+  --sun-soft:#fbefd0;
+  --danger:#c2502f;
+  --leiva:#148a7c;
+  --gauto:#2f7ea3;
+  --barrios:#e2a21b;
+  --pruyas:#d9553a;
+  --shadow:0 1px 0 rgba(13,59,69,.05),0 28px 50px -28px rgba(13,59,69,.45);
+  --display:"Bricolage Grotesque",Georgia,serif;
+  --body:"Geist",ui-sans-serif,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:#d9d5ca;color:var(--ink);font-family:var(--body);-webkit-font-smoothing:antialiased}
+
+/* ---------- Escenario 16:9 escalado ---------- */
+#stage{position:fixed;left:50%;top:50%;width:1600px;height:900px;background:var(--paper);
+  overflow:hidden;box-shadow:0 30px 80px -30px rgba(13,59,69,.5)}
+#stage::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.35;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .05 0 0 0 0 .23 0 0 0 0 .27 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+.slide{position:absolute;inset:0;padding:54px 92px 86px;visibility:hidden;opacity:0;transition:opacity .5s var(--ease),visibility 0s .5s}
+.slide.active{visibility:visible;opacity:1;transition:opacity .5s var(--ease)}
+.rv{opacity:0;transform:translateY(16px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.slide.active .rv{opacity:1;transform:none;transition-delay:calc(var(--d,0) * 90ms + 120ms)}
+
+/* ---------- Cabecera y pie ---------- */
+.top{display:flex;justify-content:space-between;align-items:center;height:30px;margin-bottom:22px}
+.kicker{font:600 13px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.who{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink-2);padding:7px 14px 7px 12px;border:1px solid var(--line);border-radius:99px;background:var(--card)}
+.who::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--c)}
+.who b{font-weight:600;color:var(--ink)}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:-.025em;line-height:1.02}
+h2{font-size:54px;max-width:1000px}
+h2 em,h1 em{font-style:normal;background:linear-gradient(transparent 62%,var(--sun-soft) 62%,var(--sun-soft) 92%,transparent 92%)}
+h3{font-size:24px;letter-spacing:-.015em}
+.lead{font-size:21px;line-height:1.5;color:var(--ink-2);max-width:60ch}
+.small{font-size:14px;color:var(--ink-3);line-height:1.45}
+.mono{font-family:var(--mono)}
+.label{font:600 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+
+.foot{position:absolute;left:92px;right:92px;bottom:30px;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--ink-3);z-index:5}
+.foot .nav{display:flex;align-items:center;gap:14px}
+.foot button{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;display:grid;place-items:center;transition:transform .2s var(--ease),background .2s}
+.foot button:hover{background:var(--accent-soft)}
+.foot button:active{transform:scale(.94)}
+.foot button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.foot svg{width:16px;height:16px}
+#count{font-family:var(--mono);color:var(--ink-2);min-width:62px;text-align:center}
+.progress{position:absolute;left:0;bottom:0;height:4px;background:var(--accent);transition:width .6s var(--ease);z-index:5}
+
+/* ---------- Mockups ---------- */
+.win{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.win .bar{flex:none;height:30px;display:flex;align-items:center;gap:6px;padding:0 12px;background:#ecE9e1;border-bottom:1px solid var(--line);font:500 12px var(--mono);color:var(--ink-2);white-space:nowrap}
+.win .bar i{width:10px;height:10px;border-radius:50%;background:#d3cfc4;flex:none}
+.win .bar i:first-child{background:#e2836b}.win .bar i:nth-child(2){background:#e9c15a}.win .bar i:nth-child(3){background:#7cbf8e}
+.win .bar .t{margin-left:8px;overflow:hidden;text-overflow:ellipsis}
+.win .bar .url{flex:1;margin-left:10px;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:3px 10px;overflow:hidden;text-overflow:ellipsis}
+.win.term{background:#0f1416;border-color:#0f1416}
+.win.term .bar{background:#1d2629;color:#93aaad;border-color:#0b0f10}
+.win .body{flex:1;min-height:0;position:relative}
+.win .body img,.phone img,.laptop img{display:block;width:100%;height:100%;object-fit:cover;object-position:top left}
+.zoom{cursor:zoom-in}
+.cap{font-size:13px;color:var(--ink-3);margin-top:8px}
+
+.laptop .lid{background:#172024;border-radius:16px 16px 0 0;padding:12px 12px 14px;box-shadow:var(--shadow)}
+.laptop .lid .body{aspect-ratio:16/9;border-radius:4px;overflow:hidden;background:#fff}
+.laptop .deck{height:18px;margin:0 -44px;background:linear-gradient(#e2dfd6,#bfbbb0);border-radius:2px 2px 16px 16px;position:relative}
+.laptop .deck::before{content:"";position:absolute;left:50%;top:0;width:110px;height:7px;margin-left:-55px;background:#a9a59a;border-radius:0 0 8px 8px}
+
+.phone{background:#172024;border-radius:40px;padding:10px;box-shadow:var(--shadow),inset 0 0 0 1.5px #39464a}
+.phone .scr{position:relative;height:100%;border-radius:31px;overflow:hidden;background:#fff}
+.phone .scr::before{content:"";position:absolute;top:9px;left:50%;width:76px;height:22px;margin-left:-38px;background:#172024;border-radius:12px;z-index:2}
+
+.tag{display:inline-flex;align-items:center;gap:8px;font:500 13px var(--mono);color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 11px;box-shadow:0 10px 24px -16px rgba(13,59,69,.5);white-space:nowrap}
+.tag b{color:var(--accent);font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none}
+.pulse{animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(20,138,124,.45)}50%{box-shadow:0 0 0 6px rgba(20,138,124,0)}}
+.ico{width:22px;height:22px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- 1. Portada ---------- */
+.cover{padding-top:62px}
+.uni{display:flex;align-items:center;gap:18px}
+.uni .logo{width:66px;height:66px;border-radius:50%;background:#fff;display:grid;place-items:center;border:1px solid var(--line)}
+.uni .logo img{width:40px}
+.uni b{display:block;font:600 14px var(--mono);letter-spacing:.18em;text-transform:uppercase}
+.uni span{font-size:15px;color:var(--ink-2)}
+.cover h1{font-size:84px;margin:58px 0 26px;max-width:760px}
+.cover .lead{max-width:620px}
+.cover .meta{margin-top:30px;font:500 14px var(--mono);color:var(--accent);letter-spacing:.04em}
+.team{display:grid;grid-template-columns:repeat(2,auto);gap:12px 36px;margin-top:44px;width:max-content}
+.team span{display:flex;align-items:center;gap:10px;font-size:16px}
+.team span::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c)}
+.hero{position:absolute;right:56px;top:96px;width:760px;height:700px}
+.hero .rings{position:absolute;right:-180px;top:-210px;width:760px;opacity:.9}
+.hero .laptop{position:absolute;right:30px;top:120px;width:620px}
+.hero .phone{position:absolute;left:10px;top:300px;width:214px;height:440px;transform:rotate(-4deg)}
+.hero .path{position:absolute;inset:0;pointer-events:none}
+.hero .tag{position:absolute}
+
+/* ---------- 2. Por qué ---------- */
+.why{display:grid;grid-template-columns:1.08fr .92fr;gap:64px;margin-top:6px}
+.cmp{margin-top:30px;display:grid;grid-template-columns:150px 1fr 1fr;border-top:1px solid var(--line)}
+.cmp>div{padding:13px 16px 13px 0;border-bottom:1px solid var(--line);font-size:16.5px;line-height:1.4}
+.cmp .h{font:600 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);padding-top:16px}
+.cmp .k{font-weight:600;color:var(--ink-2);font-size:15px}
+.cmp .old{color:var(--ink-3)}
+.cmp .new{color:var(--ink);font-weight:500}
+.cmp .h.new{color:var(--accent)}
+.goal{margin-top:28px;display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center;padding:18px 22px;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--sun);border-radius:10px}
+.goal p{font-size:16px;line-height:1.45}
+.steps{display:flex;gap:6px;margin-top:10px}
+.steps span{font:500 12px var(--mono);padding:5px 9px;border-radius:6px;background:var(--paper-2);color:var(--ink-2)}
+.cost{background:var(--ink);color:#e9f1ef;border-radius:22px;padding:34px 36px;position:relative;overflow:hidden}
+.cost .label{color:#8fb3b0}
+.cost .big{font-family:var(--display);font-size:92px;font-weight:800;letter-spacing:-.04em;line-height:.9;margin:18px 0 6px;color:#fff}
+.cost .big small{font-size:30px;letter-spacing:-.01em;color:var(--sun);margin-left:6px}
+.bars{margin:22px 0 4px;display:grid;gap:14px}
+.bar-row{display:grid;grid-template-columns:1fr auto;gap:6px 14px;font-size:14.5px}
+.bar-row .tr{grid-column:1/-1;height:12px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden}
+.bar-row .tr i{display:block;height:100%;border-radius:6px;width:0;transition:width 1.2s var(--ease) .7s}
+.slide.active .bar-row .tr i{width:var(--w)}
+.bar-row b{font-family:var(--mono);font-weight:500;color:#fff}
+.perks{display:grid;grid-template-columns:1fr 1fr;gap:16px 22px;margin-top:26px;padding-top:24px;border-top:1px solid rgba(255,255,255,.12)}
+.perks div{display:flex;gap:11px;font-size:14.5px;line-height:1.4;color:#cfe0dd}
+.perks .ico{color:var(--sun)}
+.perks b{color:#fff;font-weight:600;display:block}
+.cost .note{margin-top:20px;font-size:12px;color:#7fa29f}
+
+/* ---------- 3. Protocolos ---------- */
+.proto{display:grid;grid-template-columns:1fr 640px;gap:56px}
+.plist{margin-top:26px;border-top:1px solid var(--line)}
+.plist>div{display:grid;grid-template-columns:118px 1fr auto;align-items:center;gap:16px;padding:13px 0;border-bottom:1px solid var(--line)}
+.plist .n{font:600 18px var(--mono);color:var(--ink)}
+.plist .n.sip{color:var(--accent)}.plist .n.rtp{color:#b57f07}
+.plist p{font-size:16px;color:var(--ink-2);line-height:1.35}
+.plist .port{font:500 13px var(--mono);color:var(--ink);background:var(--paper-2);padding:5px 9px;border-radius:6px}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:26px}
+.codecs{display:grid;gap:8px}
+.codec{display:flex;justify-content:space-between;align-items:baseline;font-size:14.5px;padding:9px 12px;border-radius:8px;background:var(--card);border:1px solid var(--line)}
+.codec b{font-family:var(--mono)}
+.codec.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.stack{display:grid;gap:5px}
+.stack div{display:flex;justify-content:space-between;font-size:14px;padding:8px 12px;border-radius:8px;background:var(--paper-2)}
+.stack div:first-child{background:var(--accent);color:#fff}
+.stack div:nth-child(2){background:var(--accent-soft)}
+.stack b{font-family:var(--mono);font-weight:500}
+.ladder{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px 20px 10px;box-shadow:var(--shadow)}
+.ladder svg{width:100%;display:block;font-family:var(--mono)}
+.msg{opacity:0;transform:translateY(-6px);transition:opacity .45s var(--ease),transform .45s var(--ease)}
+.slide.active .msg{opacity:1;transform:none;transition-delay:calc(var(--d) * 170ms + 500ms)}
+.rtp-flow{stroke-dasharray:6 8;animation:flow 1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-28}}
+
+/* ---------- 4. Asterisk ---------- */
+.ast{display:grid;grid-template-columns:1.1fr .9fr;gap:60px}
+.facts{display:flex;gap:34px;margin:24px 0 26px}
+.facts div{border-left:2px solid var(--sun);padding-left:14px}
+.facts b{display:block;font-family:var(--display);font-size:34px;letter-spacing:-.03em}
+.facts span{font-size:14px;color:var(--ink-2)}
+.arch{display:grid;grid-template-columns:1fr 150px;gap:10px}
+.layer{border-radius:12px;padding:14px 16px;border:1px solid var(--line);background:var(--card)}
+.layer .label{margin-bottom:10px;display:block}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips span{font:500 13.5px var(--mono);padding:6px 10px;border-radius:6px;background:var(--paper-2)}
+.layer.core{background:var(--ink);color:#fff;border-color:var(--ink)}
+.layer.core .label{color:#8fb3b0}
+.layer.core .chips span{background:rgba(255,255,255,.1);color:#fff}
+.layer.side{grid-row:1/4;grid-column:2;display:flex;flex-direction:column;justify-content:center;background:var(--accent-soft);border-color:transparent}
+.layer.side .chips{flex-direction:column}
+.layer.side .chips span{background:#fff}
+.b2b{margin-top:16px;font-size:15.5px;color:var(--ink-2);display:flex;gap:10px;align-items:flex-start;line-height:1.45}
+.b2b .ico{color:var(--accent);margin-top:1px}
+.timeline{position:relative;margin:26px 0 8px;display:grid;grid-template-columns:repeat(5,1fr)}
+.timeline::before{content:"";position:absolute;left:0;right:0;top:15px;height:2px;background:var(--line)}
+.ver{position:relative;padding-top:42px;font-size:13.5px;color:var(--ink-3);line-height:1.35;padding-right:8px}
+.ver::before{content:"";position:absolute;top:7px;left:0;width:18px;height:18px;border-radius:50%;background:var(--paper);border:2px solid var(--ink-3)}
+.ver b{display:block;font:600 22px var(--display);color:var(--ink-2);letter-spacing:-.02em}
+.ver.dead b{text-decoration:line-through;text-decoration-thickness:2px;color:var(--ink-3)}
+.ver.lab::before{border-color:var(--accent);background:var(--accent);box-shadow:0 0 0 5px var(--accent-soft)}
+.ver.lab b,.ver.lab{color:var(--accent)}
+.ver.rec::before{border-color:var(--sun);background:var(--sun);box-shadow:0 0 0 5px var(--sun-soft)}
+.ver.rec b{color:var(--ink)}
+.issabel{margin-top:30px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px 28px;box-shadow:var(--shadow)}
+.issabel ul{list-style:none;display:grid;gap:11px;margin-top:16px}
+.issabel li{display:flex;gap:10px;font-size:16px;line-height:1.35}
+.issabel li .ico{color:var(--accent);width:20px;height:20px}
+.vs{margin-top:18px;display:flex;gap:8px;flex-wrap:wrap}
+.vs span{font:500 13px var(--mono);padding:6px 10px;border-radius:99px;border:1px solid var(--line);color:var(--ink-3)}
+.vs span.me{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+/* ---------- 5. VM ---------- */
+.vm{display:grid;grid-template-columns:640px 1fr;gap:52px}
+.topo{margin-top:22px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;box-shadow:var(--shadow)}
+.topo svg{display:block;width:100%;font-family:var(--body)}
+.specs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+.specs div{background:var(--paper-2);border-radius:10px;padding:12px 14px}
+.specs b{display:block;font:700 26px var(--display);letter-spacing:-.02em}
+.specs span{font-size:13px;color:var(--ink-2)}
+.flow{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:22px 24px;margin-top:6px}
+.flow figure{position:relative}
+.flow .win{height:236px}
+.num{position:absolute;top:-12px;left:-12px;z-index:2;width:30px;height:30px;border-radius:50%;background:var(--barrios);color:var(--ink);font:700 15px var(--mono);display:grid;place-items:center;box-shadow:0 0 0 4px var(--paper)}
+.flow figcaption{margin-top:10px;font-size:15px;line-height:1.35}
+.flow figcaption b{display:block;font-weight:600}
+.flow figcaption span{color:var(--ink-3);font-size:13.5px}
+.overlap{position:absolute;right:-14px;top:104px;width:46%;height:116px !important;box-shadow:0 18px 36px -14px rgba(13,59,69,.55)}
+
+/* ---------- 6. Extensiones ---------- */
+.ext{position:relative;height:640px;margin-top:8px}
+.ext .panel{position:absolute;left:0;top:160px;width:620px;height:360px}
+.ext .form{position:absolute;left:150px;top:240px;width:700px;height:390px}
+.ext .micro{position:absolute;left:900px;top:30px;width:268px;height:560px}
+.ext .phone{position:absolute;left:1180px;top:60px;width:246px;height:520px;transform:rotate(3deg)}
+.ext .intro{position:absolute;left:0;top:0;width:820px}
+.cfg{position:absolute;left:900px;top:600px;width:526px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden}
+.cfg div{padding:11px 14px;border-right:1px solid var(--line)}
+.cfg div:last-child{border:0}
+.cfg span{display:block;font-size:12px;color:var(--ink-3);margin-bottom:3px}
+.cfg b{font:500 14px var(--mono)}
+.pin{position:absolute;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;background:var(--ink);color:#fff;padding:7px 12px;border-radius:99px;z-index:3}
+.pin.y{background:var(--sun);color:var(--ink)}
+
+/* ---------- 7. Pruebas ---------- */
+.test{display:grid;grid-template-columns:690px 1fr;gap:44px;margin-top:4px}
+.test .t1{height:350px}
+.test .t2{height:104px;margin-top:16px}
+.status{display:flex;gap:12px;margin-top:16px}
+.st{flex:1;display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+.st b{font:700 26px var(--display);color:var(--pruyas);letter-spacing:-.02em}
+.st span{font-size:13.5px;color:var(--ink-2);line-height:1.3}
+.ws1{height:216px}
+.ws2{height:92px;margin-top:14px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);margin-top:22px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.metrics div{padding:16px 14px 16px 0}
+.metrics div+div{padding-left:16px;border-left:1px solid var(--line)}
+.metrics b{display:block;font:800 42px var(--display);letter-spacing:-.04em;line-height:1}
+.metrics span{font-size:13.5px;color:var(--ink-2)}
+.seq{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:20px}
+.seq span{font:500 13px var(--mono);padding:6px 9px;border-radius:6px;background:var(--paper-2)}
+.seq span.r{background:var(--sun-soft);color:#8a5f00}
+.seq svg{width:14px;height:14px;stroke:var(--ink-3);fill:none;stroke-width:2}
+.verdict{margin-top:16px;font-size:16px;line-height:1.45;color:var(--ink-2)}
+.verdict b{color:var(--ink)}
+
+/* ---------- 8. Producción ---------- */
+.prod{display:grid;grid-template-columns:1.12fr .88fr;gap:46px;margin-top:22px}
+.sec{background:var(--ink);color:#e6efed;border-radius:22px;padding:30px 32px}
+.sec h3{color:#fff;display:flex;align-items:center;gap:12px}
+.sec h3 .ico{color:var(--sun);width:28px;height:28px}
+.sec>p{margin-top:8px;font-size:15.5px;color:#a9c2bf;line-height:1.45}
+.threats{margin-top:18px;border-top:1px solid rgba(255,255,255,.12)}
+.threats div{display:grid;grid-template-columns:230px 1fr;gap:18px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.12);font-size:15px;line-height:1.4}
+.threats span{color:#f3c9bd;display:flex;gap:9px;align-items:center}
+.threats span::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--pruyas);flex:none}
+.threats p{color:#fff}
+.side{display:grid;gap:14px;align-content:start}
+.blk{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 22px}
+.blk h3{font-size:20px;margin-bottom:6px}
+.blk p{font-size:15px;color:var(--ink-2);line-height:1.45}
+.blk .mono{font-size:13.5px;color:var(--ink)}
+.dim{display:flex;align-items:center;gap:22px}
+.dim b{font:800 64px var(--display);letter-spacing:-.04em;line-height:.9;color:var(--accent)}
+.dim b small{font-size:22px;letter-spacing:0;margin-left:4px}
+
+/* ---------- 9. Negocio ---------- */
+.biz-top{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:22px}
+.mode{display:flex;gap:18px;align-items:flex-start;padding:20px 24px;border:1px solid var(--line);border-radius:16px;background:var(--card)}
+.mode .ic{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:none}
+.mode .ic .ico{width:28px;height:28px}
+.mode h3{font-size:21px}
+.mode p{font-size:15px;color:var(--ink-2);margin-top:5px;line-height:1.45}
+.plans{display:grid;grid-template-columns:1fr 1.18fr 1fr;gap:18px;margin-top:22px;align-items:stretch}
+.plan{border:1px solid var(--line);border-radius:18px;padding:24px 26px;background:var(--card);display:flex;flex-direction:column}
+.plan .label{color:var(--accent)}
+.plan h3{font-size:30px;margin:8px 0 4px}
+.plan .for{font-size:14px;color:var(--ink-3)}
+.plan ul{list-style:none;margin:16px 0;display:grid;gap:8px;flex:1}
+.plan li{display:flex;gap:9px;font-size:14.5px;line-height:1.35}
+.plan li .ico{width:18px;height:18px;color:var(--accent);margin-top:1px}
+.plan .price{border-top:1px solid var(--line);padding-top:14px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.plan .price b{font:700 24px var(--display);color:var(--ink);letter-spacing:-.02em}
+.plan.hot{background:var(--ink);color:#fff;border-color:var(--ink);transform:translateY(-10px);box-shadow:var(--shadow)}
+.plan.hot .label{color:var(--sun)}
+.plan.hot .for,.plan.hot .price{color:#a9c2bf}
+.plan.hot .price{border-color:rgba(255,255,255,.14)}
+.plan.hot .price b{color:#fff}
+.plan.hot li .ico{color:var(--sun)}
+.biz-foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:14.5px;color:var(--ink-2)}
+.biz-foot b{color:var(--ink)}
+
+/* ---------- 10. Cierre ---------- */
+.end{display:grid;grid-template-columns:1fr 560px;gap:70px;margin-top:18px}
+.learn{margin-top:30px;display:grid;gap:0;border-top:1px solid var(--line)}
+.learn>div{display:grid;grid-template-columns:60px 1fr;gap:12px;padding:20px 0;border-bottom:1px solid var(--line)}
+.learn i{font:700 15px var(--mono);font-style:normal;color:var(--accent)}
+.learn h3{font-size:25px}
+.learn p{font-size:16px;color:var(--ink-2);margin-top:6px;line-height:1.45}
+.qa{background:var(--ink);border-radius:26px;color:#fff;padding:44px 42px;position:relative;overflow:hidden;height:640px;display:flex;flex-direction:column;justify-content:space-between}
+.qa .rings{position:absolute;right:-200px;top:-200px;width:600px;opacity:.5}
+.qa h2{font-size:78px;color:#fff;position:relative}
+.qa .team{margin-top:0;grid-template-columns:1fr;color:#d6e4e2}
+.qa .uni{position:relative}
+.qa .uni b{color:#fff}.qa .uni span{color:#a9c2bf}
+
+/* ---------- Lightbox ---------- */
+#lb{position:fixed;inset:0;background:rgba(10,30,35,.86);display:none;place-items:center;z-index:50;padding:3vh 3vw;cursor:zoom-out}
+#lb.open{display:grid}
+#lb figure{max-width:94vw;max-height:94vh;display:flex;flex-direction:column;align-items:center;gap:10px}
+#lb img{max-width:94vw;max-height:88vh;object-fit:contain;border-radius:8px;background:#fff;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+#lb figcaption{color:#cfe0dd;font-size:14px;font-family:var(--body)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+  .rv,.msg{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.9-7 9.5-4.1-1.6-7-5.3-7-9.5V6l7-3z"/><path d="M9 12l2.2 2.2L15.5 10"/></symbol>
+  <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2c-.5-.9-1.6-1.4-2.8-1.4-1.6 0-2.8.8-2.8 2.1 0 2.9 5.8 1.4 5.8 4.3 0 1.3-1.3 2.1-3 2.1-1.3 0-2.4-.5-2.9-1.5M12 6v1.8M12 16.3V18"/></symbol>
+  <symbol id="i-mobile" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/></symbol>
+  <symbol id="i-server" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="7" rx="2"/><rect x="3.5" y="13" width="17" height="7" rx="2"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.1 4.75 4.75 0 0 0 7 18.5z"/></symbol>
+</svg>
+
+<div id="stage" role="region" aria-roledescription="presentación" aria-label="Despliegue de telefonía IP con Asterisk">
+
+<!-- ======================= 1 · PORTADA ======================= -->
+<section class="slide cover" aria-label="Portada">
+  <div class="uni rv" style="--d:0">
+    <div class="logo"><img src="img/logo-unne.png" alt="Logo de la UNNE"></div>
+    <div><b>Universidad Nacional del Nordeste</b><span>Facultad de Ciencias Exactas y Naturales y Agrimensura</span></div>
+  </div>
+  <h1 class="rv" style="--d:1">Despliegue de <em>telefonía IP</em> con Asterisk</h1>
+  <p class="lead rv" style="--d:2">Montamos una central telefónica completa con software libre: los teléfonos de una empresa se llaman entre sí usando la misma red que ya transporta sus datos.</p>
+  <p class="meta rv" style="--d:3">Redes de Datos · Licenciatura en Sistemas de Información · Grupo 29</p>
+  <div class="team rv" style="--d:4">
+    <span style="--c:var(--leiva)">Leiva Francisco Emanuel</span>
+    <span style="--c:var(--gauto)">Gauto Diego Ignacio</span>
+    <span style="--c:var(--barrios)">Barrios Emilio Farid</span>
+    <span style="--c:var(--pruyas)">Pruyas Santiago Isaac</span>
+  </div>
+
+  <div class="hero" aria-hidden="true">
+    <svg class="rings" viewBox="0 0 400 400" fill="none" stroke="#148a7c">
+      <circle cx="200" cy="200" r="70" stroke-opacity=".5"/><circle cx="200" cy="200" r="110" stroke-opacity=".35"/>
+      <circle cx="200" cy="200" r="150" stroke-opacity=".22"/><circle cx="200" cy="200" r="190" stroke-opacity=".12"/>
+      <circle cx="200" cy="200" r="24" fill="#e9a714" stroke="none"/>
+    </svg>
+    <div class="laptop rv" style="--d:3">
+      <div class="lid"><div class="body"><img src="img/f09-panel-issabel.png" alt=""></div></div>
+      <div class="deck"></div>
+    </div>
+    <div class="phone rv" style="--d:5"><div class="scr"><img src="img/f12-zoiper.png" alt=""></div></div>
+    <svg class="path" viewBox="0 0 760 700" fill="none">
+      <path id="pk" d="M228 610 C 330 640, 500 620, 560 528" stroke="#148a7c" stroke-width="2" stroke-dasharray="4 7" class="rtp-flow"/>
+      <circle r="6" fill="#e9a714"><animateMotion dur="2.4s" repeatCount="indefinite"><mpath href="#pk"/></animateMotion></circle>
+      <circle r="6" fill="#148a7c"><animateMotion dur="2.4s" begin="1.2s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#pk"/></animateMotion></circle>
+    </svg>
+    <span class="tag rv" style="--d:6;left:262px;top:560px"><span class="dot pulse"></span><b>SIP</b> UDP 5060</span>
+    <span class="tag rv" style="--d:7;left:470px;top:640px"><b>RTP</b> voz · G.711</span>
+    <span class="tag rv" style="--d:8;right:40px;top:96px">Servidor Issabel · <b>192.168.1.98</b></span>
+  </div>
+</section>
+
+<!-- ======================= 2 · POR QUÉ ======================= -->
+<section class="slide" aria-label="Por qué telefonía IP">
+  <header class="top"><span class="kicker">Parte 1 · El problema y la propuesta</span><span class="who" style="--c:var(--leiva)">Expone <b>Leiva Francisco Emanuel</b></span></header>
+  <div class="why">
+    <div>
+      <h2 class="rv" style="--d:0">La voz ya no necesita <em>una red propia</em></h2>
+      <p class="lead rv" style="--d:1;margin-top:18px">Una empresa ya tiene red de datos. La telefonía IP la aprovecha: la voz se convierte en paquetes y viaja junto al resto del tráfico.</p>
+      <div class="cmp rv" style="--d:2">
+        <div class="h"></div><div class="h">Telefonía tradicional</div><div class="h new">Telefonía IP</div>
+        <div class="k">La voz viaja</div><div class="old">Por un circuito reservado toda la llamada</div><div class="new">En paquetes IP, compartiendo la red</div>
+        <div class="k">La central</div><div class="old">PBX física con hardware propietario</div><div class="new">Software (Asterisk) en un servidor común o una VM</div>
+        <div class="k">El cableado</div><div class="old">Una red para voz y otra para datos</div><div class="new">Una sola: la LAN y el Wi-Fi existentes</div>
+        <div class="k">Sumar un interno</div><div class="old">Técnico, placa y cable nuevo</div><div class="new">Unos minutos desde el panel web</div>
+      </div>
+      <div class="goal rv" style="--d:3">
+        <span class="label" style="color:#a87800">Objetivo<br>del TP</span>
+        <div><p>Desplegar un servicio de telefonía IP con Asterisk en un entorno virtualizado y comprobar en la red cómo funcionan sus protocolos.</p>
+          <div class="steps"><span>1 Investigación</span><span>2 Diseño</span><span>3 Implementación</span><span>4 Pruebas</span></div></div>
+      </div>
+    </div>
+    <aside class="cost rv" style="--d:2">
+      <span class="label">Inversión inicial estimada · oficina de 20 internos</span>
+      <div class="big">−85%<small>aprox.</small></div>
+      <div class="bars">
+        <div class="bar-row"><span>Central tradicional · equipo, placas, teléfonos y cableado</span><b>USD 6.000–9.000</b><div class="tr"><i style="--w:100%;background:#6f8f8c"></i></div></div>
+        <div class="bar-row"><span>Asterisk · servidor o VM, licencias USD 0, softphones gratis</span><b>USD 600–1.500</b><div class="tr"><i style="--w:15%;background:var(--sun)"></i></div></div>
+      </div>
+      <div class="perks">
+        <div><svg class="ico"><use href="#i-coin"/></svg><span><b>Sin costo por minuto</b>Llamadas internas y entre sucursales gratis; troncal SIP más barata que líneas analógicas.</span></div>
+        <div><svg class="ico"><use href="#i-mobile"/></svg><span><b>El interno va con vos</b>Se atiende desde la PC o el celular, en la oficina o fuera de ella.</span></div>
+        <div><svg class="ico"><use href="#i-plus"/></svg><span><b>Funciones de central grande</b>Menú de bienvenida (IVR), colas, buzón de voz, grabación.</span></div>
+        <div><svg class="ico"><use href="#i-shield"/></svg><span><b>Puede cifrarse</b>TLS para la señalización y SRTP para la voz: nadie escucha la llamada.</span></div>
+      </div>
+      <p class="note">Valores orientativos de mercado para comparar órdenes de magnitud; no son un presupuesto relevado en el TP.</p>
+    </aside>
+  </div>
+</section>
+
+<!-- ======================= 3 · PROTOCOLOS ======================= -->
+<section class="slide" aria-label="Protocolos">
+  <header class="top"><span class="kicker">Parte 1 · Marco teórico</span><span class="who" style="--c:var(--leiva)">Expone <b>Leiva Francisco Emanuel</b></span></header>
+  <div class="proto">
+    <div>
+      <h2 class="rv" style="--d:0">Cómo viaja una llamada <em>por la red</em></h2>
+      <p class="lead rv" style="--d:1;margin-top:16px">Una llamada IP son dos tráficos en paralelo: <b>SIP</b> organiza la llamada (quién llama, si atiende, cuándo corta) y <b>RTP</b> lleva la voz en paquetes cada 20 ms.</p>
+      <div class="plist rv" style="--d:2">
+        <div><span class="n sip">SIP</span><p>Señalización: registro, inicio y fin de llamadas</p><span class="port">UDP 5060</span></div>
+        <div><span class="n">SDP</span><p>Describe IP, puertos y códecs de la sesión</p><span class="port">dentro de SIP</span></div>
+        <div><span class="n rtp">RTP / RTCP</span><p>Transporta el audio y sus estadísticas</p><span class="port">UDP 10000–20000</span></div>
+        <div><span class="n">IAX2</span><p>Señalización y audio entre servidores Asterisk</p><span class="port">UDP 4569</span></div>
+      </div>
+      <div class="duo rv" style="--d:3">
+        <div><span class="label">Códecs</span>
+          <div class="codecs" style="margin-top:10px">
+            <div class="codec on"><b>G.711</b><span>64 kbps · sin compresión · el del lab</span></div>
+            <div class="codec"><b>G.729</b><span>8 kbps · alta compresión</span></div>
+            <div class="codec"><b>Opus</b><span>variable · se adapta a la red</span></div>
+          </div></div>
+        <div><span class="label">Dónde vive en TCP/IP</span>
+          <div class="stack" style="margin-top:10px">
+            <div>Aplicación <b>SIP · RTP</b></div>
+            <div>Transporte <b>UDP</b></div>
+            <div>Red <b>IPv4</b></div>
+            <div>Enlace <b>Ethernet · Wi-Fi</b></div>
+          </div></div>
+      </div>
+    </div>
+    <div class="ladder rv" style="--d:1">
+      <svg viewBox="0 0 600 600" role="img" aria-label="Secuencia SIP y flujo RTP entre las extensiones 1001 y 1002 a través de Asterisk">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0d3b45"/></marker>
+        </defs>
+        <g font-size="13" text-anchor="middle" font-weight="600">
+          <rect x="20" y="8" width="120" height="44" rx="10" fill="#dcefeb"/><text x="80" y="27" fill="#0d3b45">1001</text><text x="80" y="43" font-size="11" font-weight="400" fill="#4b6267">MicroSIP · PC</text>
+          <rect x="230" y="8" width="140" height="44" rx="10" fill="#0d3b45"/><text x="300" y="27" fill="#fff">Asterisk</text><text x="300" y="43" font-size="11" font-weight="400" fill="#a9c2bf">B2BUA · .98</text>
+          <rect x="460" y="8" width="120" height="44" rx="10" fill="#dcefeb"/><text x="520" y="27" fill="#0d3b45">1002</text><text x="520" y="43" font-size="11" font-weight="400" fill="#4b6267">Zoiper · iPhone</text>
+        </g>
+        <g stroke="#0d3b45" stroke-opacity=".22" stroke-dasharray="3 5"><path d="M80 56V590M300 56V590M520 56V590"/></g>
+        <g stroke="#0d3b45" stroke-width="1.6" marker-end="url(#ah)" font-size="12.5" fill="#0d3b45">
+          <g class="msg" style="--d:0"><path d="M82 98H297"/><text x="190" y="91" stroke="none" text-anchor="middle">INVITE + SDP</text></g>
+          <g class="msg" style="--d:1"><path d="M298 126H83"/><text x="190" y="119" stroke="none" text-anchor="middle" fill="#7d8e91">100 Trying</text></g>
+          <g class="msg" style="--d:2"><path d="M302 154H517"/><text x="410" y="147" stroke="none" text-anchor="middle">INVITE (nueva sesión)</text></g>
+          <g class="msg" style="--d:3"><path d="M518 182H303"/><text x="410" y="175" stroke="none" text-anchor="middle">180 Ringing</text></g>
+          <g class="msg" style="--d:3"><path d="M298 182H83"/><text x="190" y="175" stroke="none" text-anchor="middle">180 Ringing</text></g>
+          <g class="msg" style="--d:4"><path d="M518 222H303"/><text x="410" y="215" stroke="none" text-anchor="middle" font-weight="600">200 OK</text></g>
+          <g class="msg" style="--d:4"><path d="M298 222H83"/><text x="190" y="215" stroke="none" text-anchor="middle" font-weight="600">200 OK</text></g>
+          <g class="msg" style="--d:5"><path d="M82 254H297"/><text x="190" y="247" stroke="none" text-anchor="middle">ACK</text></g>
+          <g class="msg" style="--d:5"><path d="M302 254H517"/><text x="410" y="247" stroke="none" text-anchor="middle">ACK</text></g>
+        </g>
+        <g class="msg" style="--d:6">
+          <rect x="70" y="284" width="460" height="90" rx="14" fill="#fbefd0"/>
+          <path d="M84 316H516" stroke="#c48a00" stroke-width="3" class="rtp-flow"/>
+          <path d="M516 344H84" stroke="#148a7c" stroke-width="3" class="rtp-flow"/>
+          <text x="300" y="305" text-anchor="middle" font-size="13" font-weight="600" fill="#8a5f00">RTP · la voz, en ambos sentidos</text>
+          <text x="300" y="366" text-anchor="middle" font-size="11.5" fill="#8a5f00">UDP 10000–20000 · un paquete cada 20 ms</text>
+        </g>
+        <g stroke="#0d3b45" stroke-width="1.6" marker-end="url(#ah)" font-size="12.5" fill="#0d3b45">
+          <g class="msg" style="--d:7"><path d="M82 414H297"/><text x="190" y="407" stroke="none" text-anchor="middle" fill="#c2502f" font-weight="600">BYE</text></g>
+          <g class="msg" style="--d:7"><path d="M302 414H517"/><text x="410" y="407" stroke="none" text-anchor="middle" fill="#c2502f" font-weight="600">BYE</text></g>
+          <g class="msg" style="--d:8"><path d="M518 446H303"/><text x="410" y="439" stroke="none" text-anchor="middle">200 OK</text></g>
+          <g class="msg" style="--d:8"><path d="M298 446H83"/><text x="190" y="439" stroke="none" text-anchor="middle">200 OK</text></g>
+        </g>
+        <g class="msg" style="--d:9" font-size="12" fill="#4b6267">
+          <text x="20" y="500">1 · El que llama ofrece sus códecs (SDP)</text>
+          <text x="20" y="522">2 · Asterisk abre una segunda sesión hacia el destino</text>
+          <text x="20" y="544">3 · Suena, se atiende y se confirma</text>
+          <text x="20" y="566">4 · La voz va por RTP, fuera de SIP</text>
+          <text x="20" y="588">5 · Uno corta: BYE y fin de las dos sesiones</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 4 · ASTERISK ======================= -->
+<section class="slide" aria-label="Asterisk">
+  <header class="top"><span class="kicker">Parte 2 · La plataforma</span><span class="who" style="--c:var(--gauto)">Expone <b>Gauto Diego Ignacio</b></span></header>
+  <div class="ast">
+    <div>
+      <h2 class="rv" style="--d:0">Asterisk: el <em>motor</em> de la central</h2>
+      <p class="lead rv" style="--d:1;margin-top:16px">Un framework de código abierto que convierte un servidor común en una central telefónica completa.</p>
+      <div class="facts rv" style="--d:2">
+        <div><b>1999</b><span>Lo crea Mark Spencer</span></div>
+        <div><b>GPLv2</b><span>Licencia libre, sin costo</span></div>
+        <div><b>Sangoma</b><span>Lo mantiene desde 2018</span></div>
+      </div>
+      <div class="arch rv" style="--d:3">
+        <div class="layer"><span class="label">Aplicaciones del dialplan</span><div class="chips"><span>Dial()</span><span>VoiceMail()</span><span>Queue()</span><span>IVR</span></div></div>
+        <div class="layer core"><span class="label">Núcleo</span><div class="chips"><span>Motor de dialplan</span><span>Puentes de canales</span><span>Traductor de códecs</span></div></div>
+        <div class="layer"><span class="label">Canales · hablan cada protocolo</span><div class="chips"><span>chan_pjsip · SIP</span><span>chan_iax2 · IAX2</span><span>DAHDI · E1</span><span>WebRTC</span></div></div>
+        <div class="layer side"><span class="label">Integración</span><div class="chips"><span>AMI</span><span>AGI</span><span>ARI</span></div><p class="small" style="margin-top:10px">Conecta la central con CRM, ERP o apps propias</p></div>
+      </div>
+      <p class="b2b rv" style="--d:4"><svg class="ico"><use href="#i-swap"/></svg><span>Funciona como <b>B2BUA</b>: cada llamada son dos sesiones SIP independientes, y la central controla las dos.</span></p>
+    </div>
+    <div>
+      <span class="label rv" style="--d:2">Versiones · una mayor por año, LTS con 5 años de soporte</span>
+      <div class="timeline rv" style="--d:3">
+        <div class="ver dead"><b>18 LTS</b>Sin soporte desde oct. 2025</div>
+        <div class="ver lab"><b>20 LTS</b>Hasta oct. 2027 · la del lab</div>
+        <div class="ver dead"><b>21</b>Fin de ciclo oct. 2026</div>
+        <div class="ver rec"><b>22 LTS</b>Hasta oct. 2029 · recomendada</div>
+        <div class="ver"><b>23</b>Publicada oct. 2025</div>
+      </div>
+      <div class="issabel rv" style="--d:4">
+        <span class="label" style="color:var(--accent)">Distribución elegida</span>
+        <h3 style="font-size:34px;margin-top:8px">Issabel 5</h3>
+        <p class="small" style="font-size:15px;margin-top:6px">Distribución libre (GPL), sucesora de Elastix: trae Asterisk listo para usar.</p>
+        <ul>
+          <li><svg class="ico"><use href="#i-check"/></svg>Instalación completa desde una sola ISO</li>
+          <li><svg class="ico"><use href="#i-check"/></svg>Interfaz web en español</li>
+          <li><svg class="ico"><use href="#i-check"/></svg>Comunidad latinoamericana activa</li>
+          <li><svg class="ico"><use href="#i-check"/></svg>Acceso directo a la consola de Asterisk</li>
+        </ul>
+        <div class="vs"><span>Asterisk “puro”</span><span>FreePBX</span><span>VitalPBX</span><span class="me">Issabel 5 · la más simple para aprender</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 5 · VM ======================= -->
+<section class="slide" aria-label="Despliegue en máquina virtual">
+  <header class="top"><span class="kicker">Parte 3 · Despliegue del laboratorio</span><span class="who" style="--c:var(--barrios)">Expone <b>Barrios Emilio Farid</b></span></header>
+  <div class="vm">
+    <div>
+      <h2 class="rv" style="--d:0">Toda la central en <em>una máquina virtual</em></h2>
+      <div class="topo rv" style="--d:1">
+        <svg viewBox="0 0 640 360" role="img" aria-label="Topología del laboratorio">
+          <rect x="230" y="10" width="180" height="62" rx="12" fill="#0d3b45"/>
+          <text x="320" y="37" text-anchor="middle" fill="#fff" font-size="15" font-weight="600">Router / Access Point</text>
+          <text x="320" y="57" text-anchor="middle" fill="#a9c2bf" font-size="12.5" font-family="Geist Mono,monospace">LAN 192.168.1.0/24</text>
+          <path d="M290 72 L220 150" stroke="#0d3b45" stroke-width="2.5"/>
+          <text x="196" y="112" fill="#4b6267" font-size="12">cable</text>
+          <path d="M405 72 L520 168" stroke="#148a7c" stroke-width="2.5" class="rtp-flow"/>
+          <text x="478" y="110" fill="#148a7c" font-size="12" font-weight="600">Wi-Fi</text>
+          <rect x="10" y="150" width="420" height="200" rx="16" fill="none" stroke="#0d3b45" stroke-opacity=".35" stroke-dasharray="5 5"/>
+          <text x="26" y="174" fill="#4b6267" font-size="12.5">PC anfitriona · Windows · VirtualBox</text>
+          <rect x="26" y="190" width="200" height="144" rx="12" fill="#0d3b45"/>
+          <text x="44" y="218" fill="#e9a714" font-size="11" font-family="Geist Mono,monospace" letter-spacing="1.5">MÁQUINA VIRTUAL</text>
+          <text x="44" y="244" fill="#fff" font-size="17" font-weight="600">Issabel 5</text>
+          <text x="44" y="264" fill="#a9c2bf" font-size="12.5">Rocky Linux 8 + Asterisk</text>
+          <text x="44" y="314" fill="#fff" font-size="15" font-family="Geist Mono,monospace">192.168.1.98</text>
+          <text x="44" y="294" fill="#a9c2bf" font-size="11.5">red en modo puente</text>
+          <rect x="240" y="190" width="174" height="144" rx="12" fill="#dcefeb"/>
+          <text x="258" y="218" fill="#148a7c" font-size="11" font-family="Geist Mono,monospace" letter-spacing="1.5">SOFTPHONE</text>
+          <text x="258" y="244" fill="#0d3b45" font-size="17" font-weight="600">MicroSIP</text>
+          <text x="258" y="264" fill="#4b6267" font-size="12.5">extensión 1001</text>
+          <text x="258" y="314" fill="#0d3b45" font-size="15" font-family="Geist Mono,monospace">192.168.1.90</text>
+          <rect x="460" y="168" width="168" height="166" rx="22" fill="#fff" stroke="#0d3b45" stroke-opacity=".2"/>
+          <text x="478" y="198" fill="#148a7c" font-size="11" font-family="Geist Mono,monospace" letter-spacing="1.5">CELULAR</text>
+          <text x="478" y="224" fill="#0d3b45" font-size="17" font-weight="600">iPhone · Zoiper</text>
+          <text x="478" y="244" fill="#4b6267" font-size="12.5">extensión 1002</text>
+          <text x="478" y="314" fill="#0d3b45" font-size="15" font-family="Geist Mono,monospace">192.168.1.2</text>
+        </svg>
+      </div>
+      <div class="specs rv" style="--d:2">
+        <div><b>2 GB</b><span>RAM</span></div>
+        <div><b>2</b><span>CPU</span></div>
+        <div><b>20 GB</b><span>Disco</span></div>
+        <div><b>Puente</b><span>IP propia en la LAN</span></div>
+      </div>
+    </div>
+    <div class="flow">
+      <figure class="rv" style="--d:2">
+        <span class="num">1</span>
+        <div class="win"><div class="bar"><i></i><i></i><i></i><span class="t">Oracle VirtualBox · Isabel-Asterisk</span></div><div class="body"><img class="zoom" src="img/f04-vm.png" alt="Máquina virtual creada en VirtualBox"></div></div>
+        <div class="win overlap"><div class="body"><img class="zoom" src="img/f05-red-puente.png" alt="Red en modo adaptador puente" style="object-position:left center"></div></div>
+        <figcaption><b>Crear la VM</b><span>Recursos mínimos y red en modo puente</span></figcaption>
+      </figure>
+      <figure class="rv" style="--d:3">
+        <span class="num">2</span>
+        <div class="win"><div class="bar"><i></i><i></i><i></i><span class="t">Instalador de Issabel 5</span></div><div class="body"><img class="zoom" src="img/f06-instalador.png" alt="Resumen del instalador de Issabel 5"></div></div>
+        <figcaption><b>Instalar Issabel 5</b><span>Zona horaria, disco, red y contraseña de root</span></figcaption>
+      </figure>
+      <figure class="rv" style="--d:4">
+        <span class="num">3</span>
+        <div class="win"><div class="bar"><i></i><i></i><i></i><span class="t">Primer arranque</span></div><div class="body"><img class="zoom" src="img/f07-primer-arranque.png" alt="Configuración en el primer arranque"></div></div>
+        <figcaption><b>Primer arranque</b><span>Contraseñas de MariaDB y del admin web</span></figcaption>
+      </figure>
+      <figure class="rv" style="--d:5">
+        <span class="num">4</span>
+        <div class="win term"><div class="bar"><i></i><i></i><i></i><span class="t">root@issabel · ip a · asterisk -rvvv</span></div><div class="body"><img class="zoom" src="img/f08-consola-ip.png" alt="IP del servidor y consola de Asterisk"></div></div>
+        <figcaption><b>IP y consola de Asterisk</b><span>Servidor en 192.168.1.98, Asterisk 20 corriendo</span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 6 · EXTENSIONES ======================= -->
+<section class="slide" aria-label="Extensiones y softphones">
+  <header class="top"><span class="kicker">Parte 3 · Despliegue del laboratorio</span><span class="who" style="--c:var(--barrios)">Expone <b>Barrios Emilio Farid</b></span></header>
+  <div class="ext">
+    <div class="intro">
+      <h2 class="rv" style="--d:0">Un interno en <em>cada dispositivo</em></h2>
+      <p class="lead rv" style="--d:1;margin-top:14px">Las extensiones se crean desde el panel web; cualquier PC o celular con un softphone gratuito pasa a ser un interno de la central.</p>
+    </div>
+    <div class="win panel rv" style="--d:2"><div class="bar"><i></i><i></i><i></i><span class="url">https://192.168.1.98 · Dashboard</span></div><div class="body"><img class="zoom" src="img/f09-panel-issabel.png" alt="Panel web de Issabel"></div></div>
+    <div class="win form rv" style="--d:3"><div class="bar"><i></i><i></i><i></i><span class="url">https://192.168.1.98 · PBX › Extensions › Add PJSIP</span></div><div class="body"><img class="zoom" src="img/f10-extension-1001.png" alt="Creación de la extensión 1001 PJSIP en Issabel"></div></div>
+    <span class="pin rv" style="--d:5;left:640px;top:220px">Extensión 1001 · PJSIP</span>
+    <div class="win micro rv" style="--d:4"><div class="bar"><i></i><i></i><i></i><span class="t">MicroSIP · 1001</span></div><div class="body"><img class="zoom" src="img/f11-microsip.png" alt="MicroSIP con la extensión 1001"></div></div>
+    <div class="phone rv" style="--d:5"><div class="scr"><img class="zoom" src="img/f12-zoiper.png" alt="Zoiper con la extensión 1002, registro OK"></div></div>
+    <span class="pin y rv" style="--d:6;left:930px;top:4px">1001 · PC</span>
+    <span class="pin y rv" style="--d:6;left:1250px;top:20px">1002 · iPhone</span>
+    <div class="cfg rv" style="--d:7">
+      <div><span>Servidor SIP</span><b>192.168.1.98</b></div>
+      <div><span>Usuario</span><b>1001 / 1002</b></div>
+      <div><span>Transporte</span><b>UDP 5060</b></div>
+      <div><span>Códec</span><b>G.711 µ-law</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 7 · PRUEBAS ======================= -->
+<section class="slide" aria-label="Pruebas">
+  <header class="top"><span class="kicker">Parte 4 · Pruebas</span><span class="who" style="--c:var(--pruyas)">Expone <b>Pruyas Santiago Isaac</b></span></header>
+  <h2 class="rv" style="--d:0;margin-bottom:22px">La llamada funciona, <em>y la medimos</em></h2>
+  <div class="test">
+    <div>
+      <div class="win term t1 rv" style="--d:1"><div class="bar"><i></i><i></i><i></i><span class="t">issabel*CLI&gt; pjsip show endpoints</span></div><div class="body"><img class="zoom" src="img/f13-endpoints.png" alt="pjsip show endpoints: 1001 y 1002 registradas"></div></div>
+      <div class="status rv" style="--d:2">
+        <div class="st"><b>1001</b><span>Registrada · Avail<br><span class="mono">RTT 4,3 ms</span></span></div>
+        <div class="st"><b>1002</b><span>Registrada · Avail<br><span class="mono">RTT 18,1 ms</span> (Wi-Fi)</span></div>
+        <div class="st"><b>2</b><span>canales activos<br>1 llamada · G.711</span></div>
+      </div>
+      <div class="win term t2 rv" style="--d:3"><div class="bar"><i></i><i></i><i></i><span class="t">issabel*CLI&gt; core show channels</span></div><div class="body"><img class="zoom" src="img/f14-channels.png" alt="core show channels durante la llamada" style="object-position:left center"></div></div>
+    </div>
+    <div>
+      <div class="win ws1 rv" style="--d:2"><div class="bar"><i></i><i></i><i></i><span class="t">Wireshark · Telefonía › Flujo SIP</span></div><div class="body"><img class="zoom" src="img/f15-flujo-sip.png" alt="Diagrama de flujo SIP de la llamada en Wireshark" style="object-fit:contain;background:#fff"></div></div>
+      <div class="win ws2 rv" style="--d:3"><div class="bar"><i></i><i></i><i></i><span class="t">Wireshark · Telefonía › RTP › Análisis de flujos</span></div><div class="body"><img class="zoom" src="img/f16-rtp.png" alt="Análisis de los flujos RTP en Wireshark" style="object-position:left center"></div></div>
+      <div class="metrics rv" style="--d:4">
+        <div><b>0,1%</b><span>pérdida (1 de 885)</span></div>
+        <div><b>4,8 ms</b><span>jitter medio</span></div>
+        <div><b>20 ms</b><span>entre paquetes</span></div>
+        <div><b>18 s</b><span>de llamada</span></div>
+      </div>
+      <div class="seq rv" style="--d:5">
+        <span>INVITE</span><svg><use href="#i-arrow"/></svg><span>100</span><svg><use href="#i-arrow"/></svg><span>180</span><svg><use href="#i-arrow"/></svg><span>200 OK</span><svg><use href="#i-arrow"/></svg><span>ACK</span><svg><use href="#i-arrow"/></svg><span class="r">RTP</span><svg><use href="#i-arrow"/></svg><span>BYE</span>
+      </div>
+      <p class="verdict rv" style="--d:6">La secuencia capturada <b>coincide con la teoría (RFC 3261)</b>, y la calidad queda muy por encima de lo exigido: pérdida &lt; 1% y jitter bajo.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 8 · PRODUCCIÓN ======================= -->
+<section class="slide" aria-label="Seguridad y producción">
+  <header class="top"><span class="kicker">Parte 4 · Producción</span><span class="who" style="--c:var(--pruyas)">Expone <b>Pruyas Santiago Isaac</b></span></header>
+  <h2 class="rv" style="--d:0">Del laboratorio a <em>una empresa real</em></h2>
+  <div class="prod">
+    <div class="sec rv" style="--d:1">
+      <h3><svg class="ico"><use href="#i-shield"/></svg>Seguridad: el riesgo es el fraude telefónico</h3>
+      <p>Una central expuesta a internet es un blanco: si alguien entra, llama a destinos caros a costa de la empresa. Se cubre por capas.</p>
+      <div class="threats">
+        <div><span>Fuerza bruta a contraseñas SIP</span><p>Contraseñas largas y aleatorias · Fail2ban bloquea al atacante</p></div>
+        <div><span>Escaneo del puerto 5060</span><p>Firewall solo con IPs conocidas · VPN para los remotos</p></div>
+        <div><span>Llamadas a destinos caros</span><p>Bloquear internacionales en el dialplan · límite de llamadas simultáneas</p></div>
+        <div><span>Escucha de llamadas</span><p>Señalización con TLS · voz cifrada con SRTP</p></div>
+        <div><span>Acceso a la administración</span><p>No exponer la web, AMI ni ARI · cambiar credenciales por defecto</p></div>
+        <div><span>Software vulnerable</span><p>Versión LTS con soporte (Asterisk 22) y actualizaciones</p></div>
+      </div>
+    </div>
+    <div class="side">
+      <div class="blk rv" style="--d:2"><h3>NAT</h3><p>IP pública y red local declaradas en PJSIP: <span class="mono">local_net · rtp_symmetric · force_rport</span>. Desactivar el SIP ALG del router.</p></div>
+      <div class="blk rv" style="--d:3"><h3>Calidad de servicio</h3><p>Retardo &lt; 150 ms (ITU-T G.114) y pérdida &lt; 1%. VLAN de voz y marcado <span class="mono">DSCP EF</span> para RTP.</p></div>
+      <div class="blk rv" style="--d:4"><h3>Dimensionamiento</h3><div class="dim"><b>872<small>kbps</small></b><p>por sentido para 10 llamadas G.711 simultáneas (≈ 87,2 kbps cada una).</p></div></div>
+      <div class="blk rv" style="--d:5"><h3>Respaldo</h3><p>Copias periódicas de la configuración y, en organizaciones grandes, servidores redundantes.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 9 · NEGOCIO ======================= -->
+<section class="slide" aria-label="Cómo lo ofrecemos a empresas">
+  <header class="top"><span class="kicker">Propuesta comercial</span><span class="who" style="--c:var(--pruyas)">Expone <b>Pruyas Santiago Isaac</b></span></header>
+  <h2 class="rv" style="--d:0">Cómo lo llevamos <em>a las empresas</em></h2>
+  <div class="biz-top">
+    <div class="mode rv" style="--d:1"><span class="ic"><svg class="ico"><use href="#i-server"/></svg></span><div><h3>En la empresa</h3><p>Instalamos la central en un servidor o VM del cliente. <b>Pago único de instalación + abono mensual</b> de soporte, actualizaciones y monitoreo.</p></div></div>
+    <div class="mode rv" style="--d:2"><span class="ic"><svg class="ico"><use href="#i-cloud"/></svg></span><div><h3>En la nube</h3><p>La central corre en nuestros servidores. La empresa no compra hardware: <b>paga por interno por mes</b> y se suma o baja cuando quiere.</p></div></div>
+  </div>
+  <div class="plans">
+    <div class="plan rv" style="--d:3">
+      <span class="label">Inicial</span><h3>Hasta 10 internos</h3><span class="for">Comercios, consultorios, estudios</span>
+      <ul>
+        <li><svg class="ico"><use href="#i-check"/></svg>Softphones en PC y celular</li>
+        <li><svg class="ico"><use href="#i-check"/></svg>Buzón de voz y menú de bienvenida</li>
+        <li><svg class="ico"><use href="#i-check"/></svg>Seguridad base: firewall y Fail2ban</li>
+      </ul>
+      <div class="price"><b>USD 7</b> por interno/mes en la nube<br>o USD 350 + USD 35/mes en la empresa</div>
+    </div>
+    <div class="plan hot rv" style="--d:4">
+      <span class="label">Pyme · el más elegido</span><h3>Hasta 40 internos</h3><span class="for">Empresas con atención al cliente</span>
+      <ul>
+        <li><svg class="ico"><use href="#i-check"/></svg>Todo lo del plan Inicial</li>
+        <li><svg class="ico"><use href="#i-check"/></svg>Colas de atención y grabación de llamadas</li>
+        <li><svg class="ico"><use href="#i-check"/></svg>Troncal SIP con números locales</li>
+        <li><svg class="ico"><use href="#i-check"/></svg>Voz cifrada con TLS y SRTP</li>
+      </ul>
+      <div class="price"><b>USD 6</b> por interno/mes en la nube<br>o USD 900 + USD 80/mes en la empresa</div>
+    </div>
+    <div class="plan rv" style="--d:5">
+      <span class="label">Empresa</span><h3>Varias sedes</h3><span class="for">Cadenas, sucursales, call centers</span>
+      <ul>
+        <li><svg class="ico"><use href="#i-check"/></svg>Sucursales unidas por IAX2 / SIP, sin costo entre sedes</li>
+        <li><svg class="ico"><use href="#i-check"/></svg>Alta disponibilidad y respaldos</li>
+        <li><svg class="ico"><use href="#i-check"/></svg>Integración con CRM o ERP vía AMI / ARI</li>
+      </ul>
+      <div class="price"><b>A medida</b><br>según sedes y volumen de llamadas</div>
+    </div>
+  </div>
+  <div class="biz-foot rv" style="--d:6"><span>Siempre incluido: <b>Asterisk LTS con soporte, seguridad configurada y respaldos.</b></span><span class="small">Precios orientativos para el ejercicio.</span></div>
+</section>
+
+<!-- ======================= 10 · CIERRE ======================= -->
+<section class="slide" aria-label="Conclusiones">
+  <header class="top"><span class="kicker">Conclusiones</span><span class="who" style="--c:var(--pruyas)">Expone <b>Pruyas Santiago Isaac</b></span></header>
+  <div class="end">
+    <div>
+      <h2 class="rv" style="--d:0">Lo que <em>aprendimos</em></h2>
+      <div class="learn">
+        <div class="rv" style="--d:1"><i>01</i><div><h3>Es accesible</h3><p>Con software libre, una máquina virtual y softphones gratuitos se obtuvo una central funcional en pocas horas.</p></div></div>
+        <div class="rv" style="--d:2"><i>02</i><div><h3>La teoría se verifica en la red</h3><p>Wireshark mostró la secuencia SIP del RFC 3261, la separación entre SIP y RTP y el rol de Asterisk como B2BUA.</p></div></div>
+        <div class="rv" style="--d:3"><i>03</i><div><h3>Producción exige más</h3><p>NAT, calidad de servicio, seguridad y versiones con soporte son críticos fuera del laboratorio, y son justamente lo que hace valioso un servicio profesional.</p></div></div>
+      </div>
+    </div>
+    <div class="qa rv" style="--d:2">
+      <svg class="rings" viewBox="0 0 400 400" fill="none" stroke="#5fc0b2" aria-hidden="true">
+        <circle cx="200" cy="200" r="70" stroke-opacity=".6"/><circle cx="200" cy="200" r="110" stroke-opacity=".4"/>
+        <circle cx="200" cy="200" r="150" stroke-opacity=".25"/><circle cx="200" cy="200" r="190" stroke-opacity=".14"/>
+        <circle cx="200" cy="200" r="24" fill="#e9a714" stroke="none"/>
+      </svg>
+      <div class="uni">
+        <div class="logo"><img src="img/logo-unne.png" alt="Logo de la UNNE"></div>
+        <div><b>UNNE · FaCENA</b><span>Redes de Datos · Grupo 29</span></div>
+      </div>
+      <h2>¿Preguntas?</h2>
+      <div class="team">
+        <span style="--c:var(--leiva)">Leiva Francisco Emanuel</span>
+        <span style="--c:var(--gauto)">Gauto Diego Ignacio</span>
+        <span style="--c:var(--barrios)">Barrios Emilio Farid</span>
+        <span style="--c:var(--pruyas)">Pruyas Santiago Isaac</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+  <footer class="foot">
+    <span>Redes de Datos · FaCENA – UNNE · 2026</span>
+    <div class="nav">
+      <button id="prev" aria-label="Diapositiva anterior"><svg class="ico"><use href="#i-back"/></svg></button>
+      <span id="count">01 / 10</span>
+      <button id="next" aria-label="Diapositiva siguiente"><svg class="ico"><use href="#i-arrow"/></svg></button>
+    </div>
+  </footer>
+  <div class="progress" id="progress"></div>
+</div>
+
+<div id="lb" role="dialog" aria-modal="true" aria-label="Captura ampliada"><figure><img alt=""><figcaption></figcaption></figure></div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const slides = [...stage.querySelectorAll('.slide')];
+  const count = document.getElementById('count');
+  const progress = document.getElementById('progress');
+  const lb = document.getElementById('lb');
+  const pad = n => String(n).padStart(2, '0');
+  let i = 0;
+
+  function fit() {
+    const s = Math.min(innerWidth / 1600, innerHeight / 900);
+    stage.style.transform = `translate(-50%,-50%) scale(${s})`;
+  }
+
+  function go(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle('active', k === i));
+    count.textContent = `${pad(i + 1)} / ${pad(slides.length)}`;
+    progress.style.width = `${((i + 1) / slides.length) * 100}%`;
+    history.replaceState(null, '', `#${i + 1}`);
+  }
+
+  function openLb(img) {
+    lb.querySelector('img').src = img.src;
+    lb.querySelector('figcaption').textContent = img.alt;
+    lb.classList.add('open');
+  }
+
+  document.getElementById('prev').onclick = () => go(i - 1);
+  document.getElementById('next').onclick = () => go(i + 1);
+  stage.addEventListener('click', e => { if (e.target.classList.contains('zoom')) openLb(e.target); });
+  lb.onclick = () => lb.classList.remove('open');
+
+  addEventListener('keydown', e => {
+    if (lb.classList.contains('open')) { if (e.key === 'Escape') lb.classList.remove('open'); return; }
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(i + 1); }
+    else if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(i - 1); }
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(slides.length - 1);
+    else if (e.key.toLowerCase() === 'f') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  });
+
+  let x0 = null;
+  addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  addEventListener('touchend', e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 50) go(i + (dx < 0 ? 1 : -1));
+    x0 = null;
+  });
+
+  addEventListener('hashchange', () => go((parseInt(location.hash.slice(1), 10) || 1) - 1));
+  addEventListener('resize', fit);
+  fit();
+  go((parseInt(location.hash.slice(1), 10) || 1) - 1);
+})();
+</script>
+</body>
+</html>

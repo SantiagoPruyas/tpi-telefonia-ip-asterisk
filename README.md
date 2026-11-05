@@ -6,7 +6,7 @@ Integrantes: Leiva Francisco Emanuel · Gauto Diego Ignacio · Barrios Emilio Fa
 
 ## Contenido
 
-- `presentacion/index.html`: presentación en HTML (10 diapositivas). Las capturas están en `presentacion/img/`.
+- `presentacion/index.html`: presentación en HTML (10 diapositivas, pensada para unos 11 minutos). Las capturas están en `presentacion/img/`.
 - `Informe_Telefonia_IP_Asterisk (1).pdf`: informe del trabajo.
 - `Presentacion_Telefonia_IP_Asterisk_13.pdf`: presentación original usada como guía.
 
@@ -20,6 +20,7 @@ Abrir `presentacion/index.html` con doble clic en cualquier navegador.
 
 ## Cómo editarla
 
-Todo está en un único archivo, `presentacion/index.html`: cada diapositiva es un `<section class="slide">` con un comentario que la identifica (`1 · PORTADA`, `2 · POR QUÉ`, etc.). Los colores y tipografías están como variables al principio del `<style>`.
+Todo está en un único archivo, `presentacion/index.html`: cada diapositiva es un `<section class="slide">` con un comentario que la identifica (`1 · PORTADA`, `2 · CONTEXTO`, etc.). Los colores y tipografías están como variables al principio del `<style>`.
 
-Los costos (diapositiva 2) y los precios de los planes (diapositiva 9) son estimaciones orientativas: ajustarlos si hay cifras propias.
+Estructura: portada, contexto (telefonía tradicional vs IP y objetivo del TP), cómo la usaría una organización (necesidad → función de Asterisk), protocolos, Asterisk, máquina virtual, internos, pruebas, producción y conclusiones con demo en vivo.
+

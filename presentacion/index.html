@@ -238,8 +238,8 @@ h3{font-size:24px;letter-spacing:-.015em}
 .ext{position:relative;height:660px;margin-top:8px}
 .ext .panel{position:absolute;left:0;top:130px;width:640px;height:380px}
 .ext .form{position:absolute;left:150px;top:220px;width:700px;height:410px}
-.ext .micro{position:absolute;left:900px;top:30px;width:268px;height:560px}
-.ext .phone{position:absolute;left:1180px;top:60px;width:246px;height:520px;transform:rotate(3deg)}
+.ext .micro{position:absolute;left:900px;top:30px;width:268px;height:490px}
+.ext .phone{position:absolute;left:1180px;top:60px;width:246px;height:460px;transform:rotate(3deg)}
 .feats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin-top:40px}
 .feat{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:28px 30px 26px;box-shadow:var(--shadow)}
 .fi{width:56px;height:56px;border-radius:16px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
@@ -272,6 +272,9 @@ h3{font-size:24px;letter-spacing:-.015em}
 .vmail li b{color:var(--ink)}
 .vmail li.on{color:var(--ink);font-weight:600}.vmail li.on::before{background:var(--sun)}
 .ext .intro{position:absolute;left:0;top:0;width:820px}
+.swlogo{position:absolute;top:532px;height:64px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid var(--line);border-radius:12px}
+.swlogo img{height:46px;width:auto;max-width:90%;display:block;object-fit:contain}
+.swlogo.ms{left:900px;width:268px}.swlogo.zp{left:1180px;width:246px}
 .cfg{position:absolute;left:900px;top:610px;width:526px;display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden}
 .cfg div{padding:11px 14px;border-right:1px solid var(--line)}
 .cfg div:last-child{border:0}
@@ -658,6 +661,8 @@ h3{font-size:24px;letter-spacing:-.015em}
     <div class="phone rv" style="--d:5"><div class="scr"><img class="zoom" src="img/f12-zoiper.png" alt="Zoiper con la extensión 1002, registro OK"></div></div>
     <span class="pin y rv" style="--d:6;left:930px;top:4px">1001 · PC</span>
     <span class="pin y rv" style="--d:6;left:1250px;top:20px">1002 · celular</span>
+    <div class="swlogo ms rv" style="--d:6"><img src="img/logo-microsip.jpg" alt="Logo de MicroSIP, softphone de la extensión 1001"></div>
+    <div class="swlogo zp rv" style="--d:6"><img src="img/logo-zoiper.jpg" alt="Logo de Zoiper, softphone de la extensión 1002"></div>
     <div class="cfg rv" style="--d:7">
       <div><span>Servidor SIP</span><b>192.168.1.98</b></div>
       <div><span>Usuario</span><b>1001 / 1002</b></div>
